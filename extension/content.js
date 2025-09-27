@@ -28,7 +28,10 @@ class PrismAIOverlay {
     // Create main overlay container
     this.overlay = document.createElement('div');
     this.overlay.id = 'prism-ai-overlay';
-    this.overlay.className = 'prism-hidden';
+    this.overlay.className = 'prism-hidden prism-overlay-container';
+    
+    // Detect background brightness and add appropriate class
+    this.detectBackgroundBrightness();
     
     // Inject overlay HTML
     this.overlay.innerHTML = this.getOverlayHTML();
@@ -38,6 +41,52 @@ class PrismAIOverlay {
     
     // Bind event listeners
     this.bindEventListeners();
+  }
+
+  detectBackgroundBrightness() {
+    // Sample background color from different parts of the page
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = 1;
+    canvas.height = 1;
+    
+    // Try to get background color from body
+    const bodyStyle = window.getComputedStyle(document.body);
+    const bgColor = bodyStyle.backgroundColor;
+    
+    // If we can't get a good sample, check if the page has light colors
+    const hasLightBackground = this.checkForLightBackground();
+    
+    if (hasLightBackground) {
+      this.overlay.classList.add('light-background');
+    }
+  }
+
+  checkForLightBackground() {
+    // Check common indicators of light backgrounds
+    const body = document.body;
+    const html = document.documentElement;
+    
+    // Check computed styles
+    const bodyBg = window.getComputedStyle(body).backgroundColor;
+    const htmlBg = window.getComputedStyle(html).backgroundColor;
+    
+    // Check for light color keywords or high RGB values
+    const lightKeywords = ['white', 'light', '#fff', '#ffffff', 'rgb(255', 'rgba(255'];
+    const bodyIsLight = lightKeywords.some(keyword => 
+      bodyBg.toLowerCase().includes(keyword)
+    );
+    const htmlIsLight = lightKeywords.some(keyword => 
+      htmlBg.toLowerCase().includes(keyword)
+    );
+    
+    // Check for light theme indicators in classes
+    const lightClasses = ['light', 'white', 'bg-white', 'bg-light'];
+    const hasLightClass = lightClasses.some(className => 
+      body.classList.contains(className) || html.classList.contains(className)
+    );
+    
+    return bodyIsLight || htmlIsLight || hasLightClass;
   }
 
   getOverlayHTML() {
@@ -100,13 +149,13 @@ class PrismAIOverlay {
               </svg>
               <h3 class="prism-text-white prism-font-semibold">Live insights</h3>
               <div class="prism-flex prism-items-center prism-gap-2 prism-ml-auto">
-                <button class="prism-button">
+                <button class="prism-button ghost">
                   <svg class="prism-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                   </svg>
                   <span class="prism-ml-1 prism-text-sm">Show transcript</span>
                 </button>
-                <button class="prism-button">
+                <button class="prism-button ghost">
                   <svg class="prism-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
                   </svg>
@@ -133,25 +182,25 @@ class PrismAIOverlay {
             <div class="prism-space-y-3">
               <h4 class="prism-text-white prism-font-medium">Actions</h4>
               <div class="prism-space-y-2">
-                <button class="prism-w-full prism-flex prism-items-center prism-gap-3 prism-p-3 prism-rounded-lg prism-text-left prism-transition-all hover:bg-white/5 prism-text-white-70 hover:text-white">
+                <button class="prism-action-button">
                   <svg class="prism-icon prism-flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                   </svg>
                   <span class="prism-text-sm">Define EBITDA</span>
                 </button>
-                <button class="prism-w-full prism-flex prism-items-center prism-gap-3 prism-p-3 prism-rounded-lg prism-text-left prism-transition-all bg-red-500/20 border border-red-500/30 prism-text-white">
+                <button class="prism-action-button active">
                   <svg class="prism-icon prism-flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                   </svg>
                   <span class="prism-text-sm">What are the differences between EBITDA and net income?</span>
                 </button>
-                <button class="prism-w-full prism-flex prism-items-center prism-gap-3 prism-p-3 prism-rounded-lg prism-text-left prism-transition-all hover:bg-white/5 prism-text-white-70 hover:text-white">
+                <button class="prism-action-button">
                   <svg class="prism-icon prism-flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
                   </svg>
                   <span class="prism-text-sm">Suggest follow-up questions</span>
                 </button>
-                <button class="prism-w-full prism-flex prism-items-center prism-gap-3 prism-p-3 prism-rounded-lg prism-text-left prism-transition-all hover:bg-white/5 prism-text-white-70 hover:text-white">
+                <button class="prism-action-button">
                   <svg class="prism-icon prism-flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                   </svg>
@@ -171,22 +220,22 @@ class PrismAIOverlay {
                 <div class="prism-status-dot prism-bg-red-500 prism-animate-pulse"></div>
                 <h3 class="prism-text-white prism-font-semibold">AI response</h3>
               </div>
-              <div class="prism-flex prism-items-center prism-gap-2">
-                <button class="prism-button">
-                  <svg class="prism-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-                  </svg>
-                </button>
-                <button class="prism-button">
-                  <svg class="prism-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                  </svg>
-                </button>
-              </div>
+        <div class="prism-flex prism-items-center prism-gap-2">
+          <button class="prism-button ghost">
+            <svg class="prism-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+            </svg>
+          </button>
+          <button class="prism-button ghost">
+            <svg class="prism-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
             </div>
 
             <!-- Question -->
-            <div class="prism-bg-white/5 prism-rounded-lg prism-p-3 border border-white/10">
+            <div class="prism-question-bg prism-rounded-lg prism-p-3">
               <p class="prism-text-white-90 prism-text-sm">What are the differences between EBITDA and net income?</p>
             </div>
 
@@ -197,7 +246,7 @@ class PrismAIOverlay {
               </div>
 
               <div class="prism-flex prism-items-center prism-gap-2 prism-pt-2">
-                <div class="prism-badge">95% confidence</div>
+                <div class="prism-confidence-badge prism-badge">95% confidence</div>
                 <button class="prism-button prism-text-xs">
                   <svg class="prism-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
@@ -208,16 +257,16 @@ class PrismAIOverlay {
             </div>
 
             <!-- Related Topics -->
-            <div class="prism-space-y-2 prism-pt-2 border-t border-white/10">
+            <div class="prism-space-y-2 prism-pt-2 border-t prism-border-overlay-10">
               <p class="prism-text-white-60 prism-text-xs prism-font-medium">Related topics</p>
               <div class="prism-flex prism-flex-wrap prism-gap-2">
-                <button class="prism-text-xs prism-px-2 prism-py-1 prism-rounded-md prism-bg-white/5 prism-text-white-70 hover:bg-white/10 hover:text-white prism-transition-colors">
+                <button class="prism-topic-button">
                   Financial metrics
                 </button>
-                <button class="prism-text-xs prism-px-2 prism-py-1 prism-rounded-md prism-bg-white/5 prism-text-white-70 hover:bg-white/10 hover:text-white prism-transition-colors">
+                <button class="prism-topic-button">
                   Profitability analysis
                 </button>
-                <button class="prism-text-xs prism-px-2 prism-py-1 prism-rounded-md prism-bg-white/5 prism-text-white-70 hover:bg-white/10 hover:text-white prism-transition-colors">
+                <button class="prism-topic-button">
                   Cash flow
                 </button>
               </div>
