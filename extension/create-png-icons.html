@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Prism AI PNG Icon Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .icon-container {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            border-radius: 20%;
+            color: white;
+            font-weight: bold;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            margin: 10px;
+        }
+        .icon-16 { width: 16px; height: 16px; font-size: 8px; }
+        .icon-32 { width: 32px; height: 32px; font-size: 16px; }
+        .icon-48 { width: 48px; height: 48px; font-size: 24px; }
+        .icon-128 { width: 128px; height: 128px; font-size: 64px; }
+        .download-btn {
+            margin-top: 10px;
+            padding: 8px 16px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>Prism AI PNG Icon Generator</h1>
+    <p>This will automatically generate and download all PNG icons for the browser extension.</p>
+    
+    <div class="icon-container">
+        <div>
+            <div class="icon icon-16" id="icon-16">P</div>
+            <button class="download-btn" onclick="downloadIcon('icon-16', 16)">Download 16x16</button>
+        </div>
+        <div>
+            <div class="icon icon-32" id="icon-32">P</div>
+            <button class="download-btn" onclick="downloadIcon('icon-32', 32)">Download 32x32</button>
+        </div>
+        <div>
+            <div class="icon icon-48" id="icon-48">P</div>
+            <button class="download-btn" onclick="downloadIcon('icon-48', 48)">Download 48x48</button>
+        </div>
+        <div>
+            <div class="icon icon-128" id="icon-128">P</div>
+            <button class="download-btn" onclick="downloadIcon('icon-128', 128)">Download 128x128</button>
+        </div>
+    </div>
+
+    <script>
+        function downloadIcon(elementId, size) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = size;
+            canvas.height = size;
+
+            // Create gradient
+            const gradient = ctx.createLinearGradient(0, 0, size, size);
+            gradient.addColorStop(0, '#3b82f6');
+            gradient.addColorStop(1, '#8b5cf6');
+
+            // Draw background
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, size, size);
+
+            // Draw text
+            ctx.fillStyle = 'white';
+            ctx.font = `bold ${size * 0.5}px Inter, -apple-system, BlinkMacSystemFont, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('P', size / 2, size / 2);
+
+            // Download
+            canvas.toBlob(function(blob) {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `icon-${size}.png`;
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+        }
+
+        // Auto-generate all icons when page loads
+        window.onload = function() {
+            setTimeout(() => {
+                console.log('Auto-generating all PNG icons...');
+                [16, 32, 48, 128].forEach(size => {
+                    downloadIcon(`icon-${size}`, size);
+                });
+            }, 1000);
+        };
+    </script>
+</body>
+</html>
