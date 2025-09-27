@@ -4,9 +4,12 @@
   "private": true,
   "scripts": {
     "build": "next build",
+    "build:extension": "webpack --mode=production",
+    "build:extension:dev": "webpack --mode=development --watch",
     "dev": "next dev",
     "lint": "next lint",
-    "start": "next start"
+    "start": "next start",
+    "package:extension": "npm run build:extension && cd dist && zip -r ../prism-extension.zip ."
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -71,13 +74,22 @@
     "zod": "3.25.67"
   },
   "devDependencies": {
+    "@babel/core": "^7.28.4",
+    "@babel/preset-env": "^7.28.3",
     "@tailwindcss/postcss": "^4.1.9",
     "@types/node": "^22",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "babel-loader": "^9.2.1",
+    "clean-webpack-plugin": "^4.0.0",
+    "copy-webpack-plugin": "^11.0.0",
+    "css-loader": "^6.11.0",
     "postcss": "^8.5",
+    "style-loader": "^3.3.4",
     "tailwindcss": "^4.1.9",
     "tw-animate-css": "1.3.3",
-    "typescript": "^5"
+    "typescript": "^5",
+    "webpack": "^5.101.3",
+    "webpack-cli": "^5.1.4"
   }
 }

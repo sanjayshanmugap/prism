@@ -1,0 +1,314 @@
+/* Content script styles for Prism AI Extension */
+/* These styles will be injected into web pages */
+
+#prism-ai-overlay {
+  --glass-bg: rgba(255, 255, 255, 0.1);
+  --glass-border: rgba(255, 255, 255, 0.2);
+  --primary-color: #7c3aed;
+  --success-color: #10b981;
+  --warning-color: #f59e0b;
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.7);
+}
+
+/* Override any conflicting styles from the host page */
+#prism-ai-overlay * {
+  box-sizing: border-box !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+}
+
+.prism-glass-panel {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+}
+
+.prism-control-bar {
+  position: fixed !important;
+  top: 24px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  z-index: 1000000 !important;
+  pointer-events: auto !important;
+  padding: 12px 24px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 16px !important;
+  color: var(--text-primary) !important;
+  font-size: 14px !important;
+}
+
+.prism-button {
+  background: var(--glass-bg) !important;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: 50% !important;
+  width: 32px !important;
+  height: 32px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  color: var(--text-primary) !important;
+  font-size: 12px !important;
+}
+
+.prism-button:hover {
+  background: rgba(255, 255, 255, 0.2) !important;
+  transform: scale(1.05) !important;
+}
+
+.prism-button.listening {
+  background: var(--warning-color) !important;
+  animation: prism-pulse 2s infinite !important;
+}
+
+@keyframes prism-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.prism-mic-button {
+  position: fixed !important;
+  bottom: 24px !important;
+  right: 24px !important;
+  z-index: 1000000 !important;
+  pointer-events: auto !important;
+  width: 56px !important;
+  height: 56px !important;
+  border-radius: 50% !important;
+  background: var(--primary-color) !important;
+  border: none !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  box-shadow: 0 4px 20px rgba(124, 58, 237, 0.4) !important;
+  font-size: 18px !important;
+}
+
+.prism-mic-button:hover {
+  transform: scale(1.05) !important;
+  box-shadow: 0 6px 24px rgba(124, 58, 237, 0.6) !important;
+}
+
+.prism-mic-button.listening {
+  background: var(--warning-color) !important;
+  animation: prism-pulse 2s infinite !important;
+}
+
+.prism-insights-panel {
+  position: fixed !important;
+  top: 80px !important;
+  left: 24px !important;
+  width: 320px !important;
+  max-height: calc(100vh - 120px) !important;
+  z-index: 999999 !important;
+  pointer-events: auto !important;
+  padding: 20px !important;
+  color: var(--text-primary) !important;
+  overflow-y: auto !important;
+}
+
+.prism-ai-panel {
+  position: fixed !important;
+  top: 80px !important;
+  right: 24px !important;
+  width: 320px !important;
+  max-height: calc(100vh - 120px) !important;
+  z-index: 999999 !important;
+  pointer-events: auto !important;
+  padding: 20px !important;
+  color: var(--text-primary) !important;
+  overflow-y: auto !important;
+}
+
+.prism-panel-title {
+  font-weight: 600 !important;
+  margin-bottom: 12px !important;
+  font-size: 14px !important;
+  color: var(--text-primary) !important;
+}
+
+.prism-insight-item {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-radius: 8px !important;
+  padding: 12px !important;
+  margin-bottom: 8px !important;
+  font-size: 13px !important;
+  line-height: 1.4 !important;
+  color: var(--text-primary) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.prism-quick-action {
+  background: rgba(124, 58, 237, 0.3) !important;
+  border: 1px solid rgba(124, 58, 237, 0.5) !important;
+  border-radius: 6px !important;
+  padding: 6px 12px !important;
+  color: white !important;
+  cursor: pointer !important;
+  font-size: 11px !important;
+  transition: all 0.2s ease !important;
+  margin: 2px !important;
+}
+
+.prism-quick-action:hover {
+  background: rgba(124, 58, 237, 0.5) !important;
+  transform: scale(1.05) !important;
+}
+
+.prism-voice-status {
+  font-size: 12px !important;
+  color: var(--text-secondary) !important;
+  transition: color 0.3s ease !important;
+}
+
+.prism-voice-status.listening {
+  color: var(--warning-color) !important;
+  animation: prism-pulse 2s infinite !important;
+}
+
+.prism-voice-status.success {
+  color: var(--success-color) !important;
+}
+
+.prism-voice-status.error {
+  color: #ef4444 !important;
+}
+
+.prism-voice-status.warning {
+  color: var(--warning-color) !important;
+}
+
+.prism-listening-indicator {
+  position: relative !important;
+  width: 32px !important;
+  height: 32px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 14px !important;
+}
+
+.prism-pulse-ring {
+  position: absolute !important;
+  width: 32px !important;
+  height: 32px !important;
+  border: 2px solid var(--warning-color) !important;
+  border-radius: 50% !important;
+  animation: prism-pulse-ring 2s ease-out infinite !important;
+}
+
+.prism-pulse-ring-delay {
+  animation-delay: 1s !important;
+}
+
+@keyframes prism-pulse-ring {
+  0% {
+    transform: scale(0.8);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+
+.prism-refresh-button:hover {
+  background: rgba(124, 58, 237, 0.4) !important;
+  transform: scale(1.02) !important;
+}
+.prism-waveform {
+  width: 60px !important;
+  height: 20px !important;
+  display: flex !important;
+  align-items: end !important;
+  gap: 2px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.prism-waveform-bar {
+  width: 3px !important;
+  background: var(--success-color) !important;
+  border-radius: 2px !important;
+  animation: prism-waveform 1.5s ease-in-out infinite !important;
+  min-height: 4px !important;
+}
+
+.prism-waveform-bar:nth-child(2) {
+  animation-delay: 0.1s !important;
+}
+.prism-waveform-bar:nth-child(3) {
+  animation-delay: 0.2s !important;
+}
+.prism-waveform-bar:nth-child(4) {
+  animation-delay: 0.3s !important;
+}
+.prism-waveform-bar:nth-child(5) {
+  animation-delay: 0.4s !important;
+}
+
+@keyframes prism-waveform {
+  0%,
+  100% {
+    height: 4px !important;
+  }
+  50% {
+    height: 16px !important;
+  }
+}
+
+.prism-hidden {
+  display: none !important;
+}
+
+/* Ensure the overlay doesn't interfere with page interactions */
+#prism-ai-overlay {
+  pointer-events: none !important;
+}
+
+/* Only overlay elements should be interactive */
+#prism-ai-overlay .prism-control-bar,
+#prism-ai-overlay .prism-insights-panel,
+#prism-ai-overlay .prism-ai-panel,
+#prism-ai-overlay .prism-mic-button,
+#prism-ai-overlay .prism-button {
+  pointer-events: auto !important;
+}
+
+/* Responsive design for smaller screens */
+@media (max-width: 768px) {
+  .prism-insights-panel,
+  .prism-ai-panel {
+    width: 280px !important;
+  }
+
+  .prism-insights-panel {
+    left: 12px !important;
+  }
+
+  .prism-ai-panel {
+    right: 12px !important;
+  }
+
+  .prism-control-bar {
+    padding: 8px 16px !important;
+    gap: 12px !important;
+  }
+
+  .prism-mic-button {
+    bottom: 16px !important;
+    right: 16px !important;
+  }
+}

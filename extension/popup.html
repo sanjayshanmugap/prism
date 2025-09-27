@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Prism AI Overlay</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div id="popup-root">
+      <div class="popup-container">
+        <div class="header">
+          <h2>Prism AI</h2>
+          <div class="status-indicator" id="status-indicator">
+            <div class="status-dot"></div>
+            <span>Ready</span>
+          </div>
+        </div>
+
+        <div class="controls">
+          <div id="page-info" class="page-info">
+            <div style="font-size: 12px; opacity: 0.8">
+              Analyzing current page...
+            </div>
+          </div>
+
+          <button id="toggle-overlay" class="control-button primary">
+            <span id="overlay-button-text">Enable Overlay</span>
+          </button>
+
+          <button
+            id="toggle-listening"
+            class="control-button secondary"
+            disabled
+          >
+            <span id="listening-button-text">Start Listening</span>
+          </button>
+
+          <button id="analyze-page" class="control-button secondary">
+            🔄 Re-analyze Page
+          </button>
+
+          <div class="mic-info">
+            <div
+              style="
+                font-size: 11px;
+                opacity: 0.7;
+                text-align: center;
+                margin-top: 8px;
+              "
+            >
+              💡 Voice commands require microphone permission
+            </div>
+          </div>
+        </div>
+
+        <div class="settings">
+          <div class="setting-item">
+            <label for="auto-activate">Auto-activate on video calls</label>
+            <input type="checkbox" id="auto-activate" checked />
+          </div>
+
+          <div class="setting-item">
+            <label for="hotkey-enabled">Enable "Hey Prism" hotkey</label>
+            <input type="checkbox" id="hotkey-enabled" checked />
+          </div>
+        </div>
+
+        <div class="shortcuts">
+          <div class="shortcuts-title">⌨️ Keyboard Shortcuts</div>
+          <div class="shortcut-item">
+            <span class="shortcut-key">Ctrl+Shift+P</span>
+            <span class="shortcut-desc">Open Prism popup</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-key">Ctrl+Shift+O</span>
+            <span class="shortcut-desc">Toggle overlay</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-key">Ctrl+Shift+A</span>
+            <span class="shortcut-desc">Quick analyze page</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-key">Right-click</span>
+            <span class="shortcut-desc">Context menu options</span>
+          </div>
+        </div>
+
+        <div class="footer">
+          <button id="settings-button" class="link-button">
+            Advanced Settings
+          </button>
+        </div>
+      </div>
+    </div>
+    <script src="popup.js"></script>
+  </body>
+</html>
