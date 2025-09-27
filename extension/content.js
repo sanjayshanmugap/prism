@@ -10,7 +10,7 @@ class PrismContentScript {
     this.pageContent = "";
     this.aiInsights = [];
     this.isAnalyzing = false;
-    this.voiceAdapter = null;
+    this.speechRecognition = null;
     this.continuousListening = false;
     this.lastTranscript = "";
     this.init();
@@ -857,10 +857,14 @@ class PrismContentScript {
     chrome.storage.sync.set({ isListening: listening });
 
     // Notify background script for badge update
-    chrome.runtime.sendMessage({
-      action: "notifyListening",
-      listening: listening,
-    });
+    try {
+      chrome.runtime.sendMessage({
+        action: "notifyListening",
+        listening: listening,
+      });
+    } catch (error) {
+      console.warn("Failed to send message to background script:", error);
+    }
 
     // Update UI if overlay is visible
     if (this.isOverlayVisible) {
@@ -957,68 +961,181 @@ class PrismContentScript {
   }
 
   startListening() {
-    console.log("Starting voice recognition with Cedar-OS adapter...");
-
-    if (!this.voiceAdapter) {
+    console.log("Starting voice recognition...");
+    
+    if (!this.speechRecognition) {
       this.initializeSpeechRecognition();
-      // Wait a moment for initialization
-      setTimeout(() => {
-        if (this.voiceAdapter) {
-          this.voiceAdapter.startListening();
+    }
+    
+    if (this.speechRecognition) {
+      try {
+        // Set continuous listening flag
+        this.continuousListening = true;
+        this.speechRecognition.start();
+        this.updateVoiceStatus("🎤 Listening...", "listening");
+      } catch (error) {
+        console.error("Failed to start speech recognition:", error);
+        // If already started, this is normal, just update status
+        if (error.message && error.message.includes('already started')) {
+          this.updateVoiceStatus("🎤 Listening...", "listening");
+        } else {
+          this.updateVoiceStatus("❌ Mic error", "error");
+          // Reset listening state
+          this.isListening = false;
+          this.continuousListening = false;
+          this.updateListeningUI();
         }
-      }, 100);
+      }
     } else {
-      this.voiceAdapter.startListening();
+      console.warn("Speech recognition not available");
+      this.updateVoiceStatus("❌ Not supported", "error");
+      // Reset listening state
+      this.isListening = false;
+      this.updateListeningUI();
     }
   }
 
   stopListening() {
     console.log("Stopping voice recognition...");
-
-    if (this.voiceAdapter) {
-      this.voiceAdapter.stopListening();
-    } else {
-      // Fallback to old implementation if adapter not ready
-      this.continuousListening = false;
-      if (this.speechRecognition) {
-        try {
-          this.speechRecognition.stop();
-        } catch (error) {
-          console.error("Error stopping speech recognition:", error);
-        }
+    
+    // Stop continuous listening
+    this.continuousListening = false;
+    
+    if (this.speechRecognition) {
+      try {
+        this.speechRecognition.stop();
+      } catch (error) {
+        console.error("Error stopping speech recognition:", error);
       }
     }
-
+    
     this.updateVoiceStatus("💭 Ready", "ready");
   }
 
   initializeSpeechRecognition() {
-    // Load Cedar-OS voice adapter
-    const script = document.createElement("script");
-    script.src = chrome.runtime.getURL("cedar-voice-adapter.js");
-    script.onload = () => {
-      // Initialize Cedar-OS voice adapter
-      this.voiceAdapter = new window.CedarVoiceAdapter();
-
-      // Set up event handlers
-      this.voiceAdapter.setEventHandlers({
-        onStateChange: (state) => this.handleVoiceStateChange(state),
-        onTranscript: (transcript) => this.handleVoiceTranscript(transcript),
-        onResponse: (response, audioUrl) =>
-          this.handleVoiceResponse(response, audioUrl),
-      });
-
-      // Configure voice settings
-      this.voiceAdapter.updateVoiceSettings({
-        language: "en-US",
-        voiceId: "alloy",
-        useBrowserTTS: true,
-        autoAddToMessages: true,
-      });
-
-      console.log("Cedar-OS voice adapter initialized");
+    // Check if Web Speech API is available
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+      console.warn("Web Speech API not supported in this browser");
+      this.updateVoiceStatus("❌ Not supported", "error");
+      return;
+    }
+    
+    this.speechRecognition = new SpeechRecognition();
+    
+    // Configure speech recognition for continuous listening
+    this.speechRecognition.continuous = true;
+    this.speechRecognition.interimResults = true;
+    this.speechRecognition.lang = 'en-US';
+    this.speechRecognition.maxAlternatives = 1;
+    
+    // Event handlers
+    this.speechRecognition.onstart = () => {
+      console.log("Speech recognition started");
+      this.updateVoiceStatus("🎧 Listening...", "listening");
     };
-    document.head.appendChild(script);
+    
+    this.speechRecognition.onend = () => {
+      console.log("Speech recognition ended");
+      
+      // If we should continue listening and user hasn't stopped manually, restart
+      if (this.isListening && this.continuousListening) {
+        console.log("Restarting speech recognition...");
+        // Small delay to prevent rapid restart loops
+        setTimeout(() => {
+          if (this.isListening && this.continuousListening) {
+            try {
+              this.speechRecognition.start();
+            } catch (error) {
+              console.error("Failed to restart speech recognition:", error);
+              if (error.message && !error.message.includes('already started')) {
+                // If restart failed, try again after a longer delay
+                setTimeout(() => {
+                  if (this.isListening && this.continuousListening) {
+                    try {
+                      this.speechRecognition.start();
+                    } catch (retryError) {
+                      console.error("Failed to restart speech recognition on retry:", retryError);
+                      this.handleRecognitionFailure();
+                    }
+                  }
+                }, 1000);
+              }
+            }
+          }
+        }, 100);
+      } else {
+        this.updateVoiceStatus("💭 Ready", "ready");
+      }
+    };
+    
+    this.speechRecognition.onerror = (event) => {
+      console.error("Speech recognition error:", event.error);
+      
+      switch (event.error) {
+        case 'no-speech':
+          // Don't show error for no speech, just continue listening
+          console.log("No speech detected, continuing to listen...");
+          break;
+        case 'audio-capture':
+          this.updateVoiceStatus("❌ Microphone error", "error");
+          this.handleRecognitionFailure();
+          break;
+        case 'not-allowed':
+          this.updateVoiceStatus("🚫 Microphone access denied", "error");
+          this.showMicrophonePermissionMessage();
+          this.handleRecognitionFailure();
+          break;
+        case 'network':
+          this.updateVoiceStatus("🌐 Network error", "error");
+          // Try to continue after network error
+          break;
+        case 'aborted':
+          // Normal when manually stopping
+          console.log("Speech recognition aborted");
+          break;
+        default:
+          console.error(`Speech recognition error: ${event.error}`);
+          this.updateVoiceStatus(`❌ Error: ${event.error}`, "error");
+      }
+    };
+    
+    this.speechRecognition.onresult = (event) => {
+      let interimTranscript = '';
+      let finalTranscript = '';
+      
+      // Process all results
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript;
+        } else {
+          interimTranscript += transcript;
+        }
+      }
+      
+      // Update UI with current transcript
+      const displayTranscript = finalTranscript || interimTranscript;
+      if (displayTranscript.trim()) {
+        this.updateVoiceTranscript(displayTranscript);
+        this.updateVoiceStatus("🎤 Processing...", "listening");
+      }
+      
+      // Process final transcript
+      if (finalTranscript.trim()) {
+        this.lastTranscript = finalTranscript.trim();
+        this.processVoiceCommand(this.lastTranscript);
+        
+        // Brief pause to show processing, then back to listening
+        setTimeout(() => {
+          if (this.isListening) {
+            this.updateVoiceStatus("🎧 Listening...", "listening");
+          }
+        }, 1500);
+      }
+    };
   }
 
   handleRecognitionFailure() {
@@ -1029,68 +1146,13 @@ class PrismContentScript {
     chrome.storage.sync.set({ isListening: false });
 
     // Notify background script
-    chrome.runtime.sendMessage({
-      action: "notifyListening",
-      listening: false,
-    });
-  }
-
-  // Cedar-OS Voice Adapter Event Handlers
-  handleVoiceStateChange(state) {
-    this.isListening = state.isListening;
-    this.isSpeaking = state.isSpeaking;
-
-    if (state.voiceError) {
-      console.error("Voice error:", state.voiceError);
-      this.updateVoiceStatus(`❌ ${state.voiceError}`, "error");
-
-      if (state.voicePermissionStatus === "denied") {
-        this.showMicrophonePermissionMessage();
-      }
-    } else if (state.isListening) {
-      this.updateVoiceStatus("🎧 Listening...", "listening");
-      this.continuousListening = true;
-    } else if (state.isSpeaking) {
-      this.updateVoiceStatus("🔊 Speaking...", "speaking");
-    } else {
-      this.updateVoiceStatus("💭 Ready", "ready");
-      this.continuousListening = false;
-    }
-
-    this.updateListeningUI();
-    chrome.storage.sync.set({ isListening: state.isListening });
-
-    // Notify background script
-    chrome.runtime.sendMessage({
-      action: "notifyListening",
-      listening: state.isListening,
-    });
-  }
-
-  handleVoiceTranscript(transcript) {
-    console.log("Voice transcript:", transcript);
-    this.lastTranscript = transcript;
-    this.updateVoiceTranscript(transcript);
-    this.processVoiceCommand(transcript);
-  }
-
-  handleVoiceResponse(response, audioUrl) {
-    console.log("AI response:", response);
-
-    // Show response in AI panel
-    const responseElement = document.getElementById("prism-ai-response");
-    const responseContent = document.getElementById(
-      "prism-ai-response-content"
-    );
-
-    if (responseElement && responseContent) {
-      responseElement.style.display = "block";
-      responseContent.innerHTML = `
-        <div style="margin-top: 8px;">
-          <strong>🤖 AI Response:</strong><br>
-          ${response}
-        </div>
-      `;
+    try {
+      chrome.runtime.sendMessage({
+        action: "notifyListening",
+        listening: false,
+      });
+    } catch (error) {
+      console.warn("Failed to send message to background script:", error);
     }
   }
 
@@ -1259,16 +1321,20 @@ class PrismContentScript {
   }
 
   async checkAutoActivation() {
-    // Check if this is a video call page
-    const response = await chrome.runtime.sendMessage({
-      action: "detectVideoCall",
-    });
+    try {
+      // Check if this is a video call page
+      const response = await chrome.runtime.sendMessage({
+        action: "detectVideoCall",
+      });
 
-    if (response && response.isVideoCall && this.settings.autoActivate) {
-      // Auto-activate after a short delay
-      setTimeout(() => {
-        this.autoActivateOverlay();
-      }, 3000);
+      if (response && response.isVideoCall && this.settings.autoActivate) {
+        // Auto-activate after a short delay
+        setTimeout(() => {
+          this.autoActivateOverlay();
+        }, 3000);
+      }
+    } catch (error) {
+      console.warn("Failed to check auto-activation:", error);
     }
   }
 
