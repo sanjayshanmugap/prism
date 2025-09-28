@@ -7,8 +7,8 @@ import { ControlBar } from "@/components/control-bar"
 import { LiveInsights } from "@/components/live-insights"
 import { AIResponse } from "@/components/ai-response"
 import { useBackgroundBrightness } from "@/hooks/use-background-brightness"
-import { useCedarVoice } from "@/hooks/use-cedar-voice"
-import { CedarVoiceIndicator } from "@/components/cedar-voice-indicator"
+import { useVoice, useCedarStore } from "cedar-os"
+import { VoiceIndicator } from "@/src/cedar/components/voice/VoiceIndicator"
 import { cn } from "@/lib/utils"
 
 interface PrismOverlayProps {
@@ -24,11 +24,14 @@ export function PrismOverlay({ isVisible, onVisibilityChange, isListening, onLis
   const [isDragging, setIsDragging] = useState(false)
   const [transcript, setTranscript] = useState('')
   const [currentQuestion, setCurrentQuestion] = useState('')
-  const [isSpeaking, setIsSpeaking] = useState(false)
   const [persistedInsights, setPersistedInsights] = useState<string[]>([])
   const [persistedActions, setPersistedActions] = useState<Array<{text: string, type: string, active: boolean}>>([])
   const [persistedTopics, setPersistedTopics] = useState<string[]>([])
   const isLightBackground = useBackgroundBrightness()
+
+  // Use CedarOS voice hook and store
+  const voice = useVoice()
+  const messages = useCedarStore((state) => state.messages)
 
   const handleActionClick = (action: string) => {
     // Set the action as the current question to trigger AI response
@@ -47,50 +50,50 @@ export function PrismOverlay({ isVisible, onVisibilityChange, isListening, onLis
     setPersistedTopics(topics)
   }
 
-  // CedarOS Voice setup
-  const cedarVoice = useCedarVoice()
-
-  // Sync CedarOS voice with component state
+  // Get transcript from the latest user message
   useEffect(() => {
-    setTranscript(cedarVoice.transcript)
-    setIsSpeaking(cedarVoice.isListening)
+    const latestUserMessage = messages
+      .filter(msg => msg.type === 'user')
+      .pop()
     
-    // Update parent listening state
-    if (cedarVoice.isListening !== isListening) {
-      onListeningChange(cedarVoice.isListening)
+    if (latestUserMessage && 'content' in latestUserMessage) {
+      setTranscript(latestUserMessage.content || '')
     }
-  }, [cedarVoice.transcript, cedarVoice.isListening, isListening, onListeningChange])
+  }, [messages])
 
   // Handle voice toggle
-  const handleVoiceToggle = () => {
-    cedarVoice.toggleVoice()
+  const handleVoiceToggle = async () => {
+    // Check if voice is supported
+    if (!voice.checkVoiceSupport()) {
+      console.error('Voice features are not supported in this browser')
+      return
+    }
+
+    // Request permission if needed
+    if (voice.voicePermissionStatus === 'prompt') {
+      await voice.requestVoicePermission()
+    }
+
+    // Toggle voice if permission is granted
+    if (voice.voicePermissionStatus === 'granted') {
+      voice.toggleVoice()
+    } else if (voice.voicePermissionStatus === 'denied') {
+      console.error('Microphone access denied')
+    }
   }
 
   // Process transcript for questions
   useEffect(() => {
-    if (cedarVoice.transcript && cedarVoice.transcript.length > 10) {
+    if (transcript && transcript.length > 10) {
       // Check if it's a question (contains question words or ends with ?)
-      const isQuestion = /^(what|how|why|when|where|who|which|can|could|would|should|is|are|do|does|did)\b/i.test(cedarVoice.transcript.trim()) || 
-                        cedarVoice.transcript.trim().endsWith('?')
+      const isQuestion = /^(what|how|why|when|where|who|which|can|could|would|should|is|are|do|does|did)\b/i.test(transcript.trim()) || 
+                        transcript.trim().endsWith('?')
       
       if (isQuestion) {
-        setCurrentQuestion(cedarVoice.transcript)
+        setCurrentQuestion(transcript)
       }
     }
-  }, [cedarVoice.transcript])
-
-  // Auto-stop speaking state after 3 seconds of no transcript changes
-  useEffect(() => {
-    if (isSpeaking) {
-      const timeout = setTimeout(() => {
-        setIsSpeaking(false)
-      }, 3000)
-      
-      return () => clearTimeout(timeout)
-    }
-  }, [transcript, isSpeaking])
-
-  // Removed auto-hide timer - overlay only closes via user action
+  }, [transcript])
 
   if (!isVisible) return null
 
@@ -98,21 +101,11 @@ export function PrismOverlay({ isVisible, onVisibilityChange, isListening, onLis
     <div className="fixed inset-0 z-50 pointer-events-none">
       {/* Control Bar */}
       <ControlBar
-        isListening={isListening}
+        isListening={voice.isListening}
         onToggleListening={handleVoiceToggle}
         onToggleVisibility={() => onVisibilityChange(!isVisible)}
         isLightBackground={isLightBackground}
-        isSpeaking={isSpeaking}
-      />
-
-      {/* CedarOS Voice Indicator */}
-      <CedarVoiceIndicator
-        voiceState={{
-          isListening: cedarVoice.isListening,
-          isSpeaking: cedarVoice.isSpeaking,
-          voiceError: cedarVoice.voiceError,
-          voicePermissionStatus: cedarVoice.voicePermissionStatus
-        }}
+        isSpeaking={voice.isSpeaking}
       />
 
       {/* Main Overlay Panels */}
@@ -126,7 +119,7 @@ export function PrismOverlay({ isVisible, onVisibilityChange, isListening, onLis
             isMinimized={isMinimized} 
             isLightBackground={isLightBackground}
             transcript={transcript}
-            isListening={isListening}
+            isListening={voice.isListening}
             onActionClick={handleActionClick}
             onInsightsUpdate={handleInsightsUpdate}
             onActionsUpdate={handleActionsUpdate}

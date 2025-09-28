@@ -10,6 +10,9 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
+    "@mastra/core": "^0.18.0",
+    "@mastra/openai": "^1.0.1-alpha.48",
+    "@mastra/voice-openai": "^0.11.6",
     "@radix-ui/react-accordion": "1.2.2",
     "@radix-ui/react-alert-dialog": "1.1.4",
     "@radix-ui/react-aspect-ratio": "1.1.1",
@@ -55,6 +58,7 @@
     "motion-plus-react": "^1.5.4",
     "next": "^14.2.33",
     "next-themes": "^0.4.6",
+    "openai": "^5.23.1",
     "react": "^18",
     "react-day-picker": "9.8.0",
     "react-dom": "^18",
