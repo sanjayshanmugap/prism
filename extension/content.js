@@ -28,6 +28,14 @@ class PrismAIOverlay {
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       this.handleMessage(request, sendResponse);
     });
+
+    // Handle extension context invalidation
+    chrome.runtime.onConnect.addListener((port) => {
+      port.onDisconnect.addListener(() => {
+        console.log('Extension context invalidated, reloading...');
+        // Don't reload automatically, just log the event
+      });
+    });
   }
 
   createOverlay() {
@@ -375,6 +383,21 @@ class PrismAIOverlay {
     }
   }
 
+  // Safe message sending with error handling
+  async sendMessageSafely(message) {
+    try {
+      return await chrome.runtime.sendMessage(message);
+    } catch (error) {
+      console.error('Extension context error:', error);
+      // Return a fallback response
+      return {
+        success: false,
+        error: 'Extension context invalidated',
+        fallback: true
+      };
+    }
+  }
+
   toggleVisibility() {
     this.isVisible = !this.isVisible;
     if (this.isVisible) {
@@ -414,7 +437,7 @@ class PrismAIOverlay {
     }
     
     // Notify background script
-    chrome.runtime.sendMessage({
+    this.sendMessageSafely({
       action: 'listeningStateChanged',
       isListening: this.isListening
     });
@@ -488,7 +511,7 @@ class PrismAIOverlay {
   async triggerAutoAnalysis() {
     // Trigger automatic content analysis when overlay is shown
     try {
-      const response = await chrome.runtime.sendMessage({
+      const response = await this.sendMessageSafely({
         action: 'triggerAnalysis',
         content: {
           url: window.location.href,
