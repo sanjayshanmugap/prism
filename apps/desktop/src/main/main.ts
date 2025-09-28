@@ -1,7 +1,7 @@
 import { app, BrowserWindow, globalShortcut, Tray, Menu, nativeImage } from 'electron';
 import { join } from 'path';
 import { fork, ChildProcess } from 'child_process';
-import { setupIPC } from './ipc';
+import { setupIPC, setOverlayHandlers } from './ipc';
 import { setupDatabase } from './database';
 import Store from 'electron-store';
 
@@ -41,6 +41,14 @@ class PrismApp {
     // Setup IPC handlers
     setupIPC(this.agentProcess);
     
+    // Setup overlay handlers
+    setOverlayHandlers({
+      showOverlay: () => this.showOverlay(),
+      hideOverlay: () => this.hideOverlay(),
+      toggleOverlay: () => this.toggleOverlay(),
+      toggleClickThrough: () => this.toggleClickThrough(),
+    });
+    
     // Start agent process
     await this.startAgentProcess();
     
@@ -55,21 +63,33 @@ class PrismApp {
   }
 
   private createMainWindow(): void {
-    const bounds = this.store.get('windowBounds') as { width: number; height: number };
+    const { screen } = require('electron');
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width, height } = primaryDisplay.workAreaSize;
     
     this.mainWindow = new BrowserWindow({
-      width: bounds.width,
-      height: bounds.height,
+      width: width,
+      height: height,
+      x: 0,
+      y: 0,
       frame: false,
       transparent: true,
       alwaysOnTop: true,
       skipTaskbar: true,
       resizable: false,
-      focusable: true,
+      focusable: false, // Don't steal focus from other apps
+      movable: false,
+      minimizable: false,
+      maximizable: false,
+      closable: false,
+      hasShadow: false,
+      acceptFirstMouse: false,
+      enableLargerThanScreen: true,
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
         preload: join(__dirname, '../preload/preload.js'),
+        backgroundThrottling: false,
       },
     });
 
@@ -81,15 +101,23 @@ class PrismApp {
       this.mainWindow.loadFile(join(__dirname, '../renderer/index.html'));
     }
 
+    // Enable click-through by default (can be toggled)
+    this.setClickThrough(true);
+
     // Initially hide the window
     this.mainWindow.hide();
 
-    // Save window bounds on resize
-    this.mainWindow.on('resize', () => {
-      if (this.mainWindow) {
-        const bounds = this.mainWindow.getBounds();
-        this.store.set('windowBounds', { width: bounds.width, height: bounds.height });
+    // Handle window events
+    this.mainWindow.on('blur', () => {
+      // Don't hide on blur - keep overlay visible
+      if (this.store.get('privacy.clickThroughOverlay')) {
+        this.setClickThrough(true);
       }
+    });
+
+    this.mainWindow.on('focus', () => {
+      // Disable click-through when focused for interaction
+      this.setClickThrough(false);
     });
   }
 
@@ -138,7 +166,7 @@ class PrismApp {
 
     // Voice ask shortcut
     globalShortcut.register(shortcuts.voiceAsk, () => {
-      this.showWindow();
+      this.showOverlay();
       this.mainWindow?.webContents.send('trigger-voice-ask');
     });
 
@@ -147,9 +175,9 @@ class PrismApp {
       this.triggerHighlightExplain();
     });
 
-    // Toggle panel shortcut
+    // Toggle overlay shortcut
     globalShortcut.register(shortcuts.togglePanel, () => {
-      this.toggleWindow();
+      this.toggleOverlay();
     });
   }
 
@@ -160,18 +188,26 @@ class PrismApp {
 
     const contextMenu = Menu.buildFromTemplate([
       {
-        label: 'Show/Hide Panel',
-        click: () => this.toggleWindow(),
+        label: 'Show/Hide Overlay',
+        click: () => this.toggleOverlay(),
       },
       {
         label: 'Voice Ask',
         accelerator: this.store.get('shortcuts.voiceAsk') as string,
         click: () => {
-          this.showWindow();
+          this.showOverlay();
           this.mainWindow?.webContents.send('trigger-voice-ask');
         },
       },
       { type: 'separator' },
+      {
+        label: 'Click-Through Mode',
+        type: 'checkbox',
+        checked: this.store.get('privacy.clickThroughOverlay') as boolean,
+        click: () => {
+          this.toggleClickThrough();
+        },
+      },
       {
         label: 'Privacy Mode',
         type: 'checkbox',
@@ -179,18 +215,6 @@ class PrismApp {
         click: (item) => {
           this.store.set('privacy.noAudioMode', item.checked);
           this.mainWindow?.webContents.send('privacy-mode-changed', item.checked);
-        },
-      },
-      {
-        label: 'Hide Overlay',
-        type: 'checkbox',
-        checked: false,
-        click: (item) => {
-          if (item.checked) {
-            this.hideWindow();
-          } else {
-            this.showWindow();
-          }
         },
       },
       { type: 'separator' },
@@ -282,6 +306,42 @@ class PrismApp {
 
   public getStore(): Store {
     return this.store;
+  }
+
+  private setClickThrough(enable: boolean): void {
+    if (this.mainWindow) {
+      this.mainWindow.setIgnoreMouseEvents(enable, { forward: true });
+    }
+  }
+
+  public toggleClickThrough(): void {
+    const currentSetting = this.store.get('privacy.clickThroughOverlay') as boolean;
+    this.store.set('privacy.clickThroughOverlay', !currentSetting);
+    this.setClickThrough(!currentSetting);
+  }
+
+  public showOverlay(): void {
+    if (this.mainWindow) {
+      this.mainWindow.show();
+      this.mainWindow.setAlwaysOnTop(true, 'screen-saver');
+      this.setClickThrough(false); // Allow interaction when showing
+      this.mainWindow.webContents.send('overlay-visible', true);
+    }
+  }
+
+  public hideOverlay(): void {
+    if (this.mainWindow) {
+      this.mainWindow.hide();
+      this.mainWindow.webContents.send('overlay-visible', false);
+    }
+  }
+
+  public toggleOverlay(): void {
+    if (this.mainWindow && this.mainWindow.isVisible()) {
+      this.hideOverlay();
+    } else {
+      this.showOverlay();
+    }
   }
 }
 

@@ -1,49 +1,37 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAppStore } from '../state/store';
-import { CedarPanel } from './CedarPanel';
-import { Tooltip } from './Tooltip';
+import { SystemOverlay } from './SystemOverlay';
 
 export const App: React.FC = () => {
-  const { isVisible, activeView, setVisible, askAgent } = useAppStore();
+  const { isVisible, setVisible, askAgent } = useAppStore();
+  const [overlayVisible, setOverlayVisible] = useState(false);
 
   useEffect(() => {
     // For development, make the app visible by default
     if (!window.electronAPI) {
-      setVisible(true);
+      setOverlayVisible(true);
     }
 
     // Listen for events from main process
     if (window.electronAPI) {
       window.electronAPI.onTriggerVoiceAsk(() => {
-        setVisible(true);
-        // Trigger voice input
-        handleVoiceAsk();
+        setOverlayVisible(true);
       });
 
       window.electronAPI.onTriggerHighlightExplain((text: string) => {
+        setOverlayVisible(true);
         handleHighlightExplain(text);
+      });
+
+      window.electronAPI.onOverlayVisible((visible: boolean) => {
+        setOverlayVisible(visible);
       });
 
       window.electronAPI.onPrivacyModeChanged((enabled: boolean) => {
         console.log('Privacy mode changed:', enabled);
       });
     }
-  }, [setVisible]);
-
-  const handleVoiceAsk = async () => {
-    // For MVP, we'll simulate voice input with a prompt
-    const query = prompt('What would you like to know?');
-    if (query) {
-      await askAgent({
-        query,
-        mode: 'article',
-        context: {
-          url: window.location.href,
-          title: document.title,
-        },
-      });
-    }
-  };
+  }, []);
 
   const handleHighlightExplain = async (text: string) => {
     await askAgent({
@@ -51,31 +39,23 @@ export const App: React.FC = () => {
       mode: 'highlight',
       selectionText: text,
       context: {
-        url: window.location.href,
-        title: document.title,
+        url: 'System-wide selection',
+        title: 'Highlighted Text',
       },
     });
   };
 
-  if (!isVisible) {
-    return null;
-  }
+  const handleVisibilityChange = (visible: boolean) => {
+    setOverlayVisible(visible);
+    if (window.electronAPI && !visible) {
+      window.electronAPI.hideOverlay();
+    }
+  };
 
   return (
-    <div className="fixed inset-0 z-50 pointer-events-none">
-      {/* Glass overlay background */}
-      <div className="absolute inset-0 bg-black/20 backdrop-blur-sm pointer-events-auto" 
-           onClick={() => setVisible(false)} />
-      
-      {/* Main panel */}
-      <div className="absolute right-4 top-4 bottom-4 w-96 pointer-events-auto">
-        <CedarPanel />
-      </div>
-      
-      {/* Tooltip for quick explanations */}
-      {activeView === 'result' && (
-        <Tooltip />
-      )}
-    </div>
+    <SystemOverlay
+      isVisible={overlayVisible}
+      onVisibilityChange={handleVisibilityChange}
+    />
   );
 };

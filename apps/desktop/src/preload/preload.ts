@@ -34,6 +34,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('agent-response', (_event, response) => callback(response));
     return () => ipcRenderer.removeListener('agent-response', callback);
   },
+  
+  // Overlay control
+  showOverlay: () => ipcRenderer.invoke('overlay:show'),
+  hideOverlay: () => ipcRenderer.invoke('overlay:hide'),
+  toggleOverlay: () => ipcRenderer.invoke('overlay:toggle'),
+  toggleClickThrough: () => ipcRenderer.invoke('overlay:toggle-click-through'),
+  
+  onOverlayVisible: (callback: (visible: boolean) => void) => {
+    ipcRenderer.on('overlay-visible', (_event, visible) => callback(visible));
+    return () => ipcRenderer.removeListener('overlay-visible', callback);
+  },
 });
 
 // Also expose versions

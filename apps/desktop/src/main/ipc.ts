@@ -81,3 +81,41 @@ ipcMain.handle('briefs:listPins', async () => {
   // Database operations will be implemented in database.ts
   return { pins: [] };
 });
+
+// Overlay control handlers (these will be set up by the main app)
+let overlayHandlers: {
+  showOverlay: () => void;
+  hideOverlay: () => void;
+  toggleOverlay: () => void;
+  toggleClickThrough: () => void;
+} | null = null;
+
+export function setOverlayHandlers(handlers: {
+  showOverlay: () => void;
+  hideOverlay: () => void;
+  toggleOverlay: () => void;
+  toggleClickThrough: () => void;
+}): void {
+  overlayHandlers = handlers;
+  
+  // Set up IPC handlers
+  ipcMain.handle('overlay:show', () => {
+    overlayHandlers?.showOverlay();
+    return { success: true };
+  });
+
+  ipcMain.handle('overlay:hide', () => {
+    overlayHandlers?.hideOverlay();
+    return { success: true };
+  });
+
+  ipcMain.handle('overlay:toggle', () => {
+    overlayHandlers?.toggleOverlay();
+    return { success: true };
+  });
+
+  ipcMain.handle('overlay:toggle-click-through', () => {
+    overlayHandlers?.toggleClickThrough();
+    return { success: true };
+  });
+}
