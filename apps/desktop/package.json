@@ -1,0 +1,51 @@
+{
+  "name": "@prism/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/main/main.js",
+  "scripts": {
+    "build": "pnpm build:main && pnpm build:renderer",
+    "build:main": "tsup src/main/main.ts --format cjs --target node18 --out-dir dist/main",
+    "build:renderer": "vite build",
+    "dev": "concurrently \"pnpm dev:main\" \"pnpm dev:renderer\"",
+    "dev:main": "tsup src/main/main.ts --format cjs --target node18 --out-dir dist/main --watch",
+    "dev:renderer": "vite",
+    "electron": "electron dist/main/main.js",
+    "package": "electron-builder",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@prism/shared": "workspace:*",
+    "@types/uuid": "^9.0.8",
+    "better-sqlite3": "^9.4.3",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.1",
+    "electron-store": "^8.1.0",
+    "framer-motion": "^11.1.7",
+    "keytar": "^7.9.0",
+    "lucide-react": "^0.378.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "tailwind-merge": "^2.3.0",
+    "uuid": "^9.0.1",
+    "zustand": "^4.5.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.9",
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.2.79",
+    "@types/react-dom": "^18.2.25",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.19",
+    "concurrently": "^8.2.2",
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.3",
+    "tailwindcss-animate": "^1.0.7",
+    "tsup": "^8.0.2",
+    "typescript": "^5.4.5",
+    "vite": "^5.2.10"
+  }
+}
