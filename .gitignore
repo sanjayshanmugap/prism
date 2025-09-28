@@ -245,3 +245,20 @@ extension/tmp/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Next.js
+.next/
+out/
+build/
+
+# Package managers
+package-lock.json
+yarn.lock
+pnpm-lock.yaml

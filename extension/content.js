@@ -17,6 +17,8 @@ class PrismAIOverlay {
   }
 
   init() {
+    console.log('Prism AI Overlay: Initializing content script');
+    
     // Wait for page to be ready
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', () => this.createOverlay());
@@ -24,21 +26,32 @@ class PrismAIOverlay {
       this.createOverlay();
     }
 
-    // Listen for messages from background script
+    // Listen for messages from background script and popup
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       this.handleMessage(request, sendResponse);
+      return true; // Keep message channel open
     });
 
     // Handle extension context invalidation
     chrome.runtime.onConnect.addListener((port) => {
       port.onDisconnect.addListener(() => {
-        console.log('Extension context invalidated, reloading...');
-        // Don't reload automatically, just log the event
+        console.log('Extension context invalidated');
       });
     });
+
+    // Add keyboard shortcuts
+    this.setupKeyboardShortcuts();
   }
 
   createOverlay() {
+    console.log('Prism AI Overlay: Creating overlay');
+    
+    // Check if overlay already exists
+    if (document.getElementById('prism-ai-overlay')) {
+      console.log('Prism AI Overlay: Overlay already exists');
+      return;
+    }
+
     // Create main overlay container
     this.overlay = document.createElement('div');
     this.overlay.id = 'prism-ai-overlay';
@@ -50,256 +63,194 @@ class PrismAIOverlay {
     // Inject overlay HTML
     this.overlay.innerHTML = this.getOverlayHTML();
     
-    // Append to body
+    // Add to page
     document.body.appendChild(this.overlay);
     
     // Bind event listeners
     this.bindEventListeners();
+    
+    console.log('Prism AI Overlay: Overlay created and added to page');
   }
 
   detectBackgroundBrightness() {
-    // Sample background color from different parts of the page
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    canvas.width = 1;
-    canvas.height = 1;
+    // Simple background detection
+    const bodyStyles = window.getComputedStyle(document.body);
+    const bgColor = bodyStyles.backgroundColor;
     
-    // Try to get background color from body
-    const bodyStyle = window.getComputedStyle(document.body);
-    const bgColor = bodyStyle.backgroundColor;
+    // Check if background is light
+    let hasLightBackground = false;
     
-    // If we can't get a good sample, check if the page has light colors
-    const hasLightBackground = this.checkForLightBackground();
+    if (bgColor && bgColor !== 'rgba(0, 0, 0, 0)') {
+      const rgb = bgColor.match(/\d+/g);
+      if (rgb && rgb.length >= 3) {
+        const brightness = (parseInt(rgb[0]) + parseInt(rgb[1]) + parseInt(rgb[2])) / 3;
+        hasLightBackground = brightness > 128;
+      }
+    }
+    
+    // Also check for common light backgrounds
+    const lightSelectors = [
+      'body[style*="background-color: white"]',
+      'body[style*="background-color: #fff"]',
+      'body[style*="background-color: #ffffff"]',
+      '.bg-white', '.bg-gray-50', '.bg-gray-100'
+    ];
+    
+    lightSelectors.forEach(selector => {
+      if (document.querySelector(selector)) {
+        hasLightBackground = true;
+      }
+    });
     
     if (hasLightBackground) {
       this.overlay.classList.add('light-background');
     }
   }
 
-  checkForLightBackground() {
-    // Check common indicators of light backgrounds
-    const body = document.body;
-    const html = document.documentElement;
-    
-    // Check computed styles
-    const bodyBg = window.getComputedStyle(body).backgroundColor;
-    const htmlBg = window.getComputedStyle(html).backgroundColor;
-    
-    // Check for light color keywords or high RGB values
-    const lightKeywords = ['white', 'light', '#fff', '#ffffff', 'rgb(255', 'rgba(255'];
-    const bodyIsLight = lightKeywords.some(keyword => 
-      bodyBg.toLowerCase().includes(keyword)
-    );
-    const htmlIsLight = lightKeywords.some(keyword => 
-      htmlBg.toLowerCase().includes(keyword)
-    );
-    
-    // Check for light theme indicators in classes
-    const lightClasses = ['light', 'white', 'bg-white', 'bg-light'];
-    const hasLightClass = lightClasses.some(className => 
-      body.classList.contains(className) || html.classList.contains(className)
-    );
-    
-    return bodyIsLight || htmlIsLight || hasLightClass;
-  }
-
   getOverlayHTML() {
     return `
-      <!-- Control Bar -->
-      <div class="prism-control-bar">
-        <div class="glass-panel">
-          <!-- Play/Pause -->
-          <button class="prism-button" id="prism-play-pause">
-            <svg class="prism-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-          </button>
+      <div class="glass-panel prism-overlay-main">
+        <!-- Control Bar -->
+        <div class="prism-control-bar">
+          <div class="prism-flex prism-items-center prism-gap-3">
+            <!-- Play/Pause Button -->
+            <button class="prism-action-button" id="prism-play-btn">
+              <svg class="prism-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h1m4 0h1m6-4a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </button>
 
-          <!-- Voice Waveform (shown when listening) -->
-          <div class="prism-voice-waveform prism-hidden" id="prism-waveform">
-            <div class="prism-flex prism-gap-1">
-              <div class="prism-w-1 prism-h-4 prism-bg-blue-400 prism-rounded-full waveform-bar"></div>
-              <div class="prism-w-1 prism-h-3 prism-bg-blue-400 prism-rounded-full waveform-bar" style="animation-delay: 0.1s"></div>
-              <div class="prism-w-1 prism-h-5 prism-bg-blue-400 prism-rounded-full waveform-bar" style="animation-delay: 0.2s"></div>
-              <div class="prism-w-1 prism-h-2 prism-bg-blue-400 prism-rounded-full waveform-bar" style="animation-delay: 0.3s"></div>
-              <div class="prism-w-1 prism-h-4 prism-bg-blue-400 prism-rounded-full waveform-bar" style="animation-delay: 0.4s"></div>
+            <!-- Voice Waveform -->
+            <div class="prism-voice-waveform" id="prism-waveform">
+              <div class="prism-wave-bar"></div>
+              <div class="prism-wave-bar"></div>
+              <div class="prism-wave-bar"></div>
+              <div class="prism-wave-bar"></div>
+              <div class="prism-wave-bar"></div>
             </div>
+
+            <!-- Timer -->
+            <div class="prism-timer">00:00</div>
+
+            <!-- Ask AI Button -->
+            <button class="prism-button prism-button-ask-ai" id="prism-ask-ai">
+              <svg class="prism-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+              </svg>
+              Ask AI
+            </button>
+
+            <!-- Show/Hide Toggle -->
+            <button class="prism-button prism-button-ghost" id="prism-toggle-btn">
+              <svg class="prism-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+              </svg>
+            </button>
           </div>
 
-          <!-- Timer -->
-          <div class="prism-text-white prism-text-sm prism-font-mono" id="prism-timer">00:18</div>
-
-          <!-- Ask AI Button -->
-          <button class="prism-button ask-ai" id="prism-ask-ai">
-            Ask AI
-          </button>
-
-          <!-- Keyboard Shortcut -->
-          <div class="prism-badge">⌘ ⇧</div>
-
-          <!-- Show/Hide Toggle -->
-          <button class="prism-button" id="prism-show-hide">
-            <span class="prism-text-sm prism-mr-2">Show/Hide</span>
-            <svg class="prism-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-            </svg>
-          </button>
-
-          <!-- Keyboard Shortcut -->
-          <div class="prism-badge">⌘ \\</div>
+          <!-- Keyboard Shortcuts -->
+          <div class="prism-shortcuts">
+            <span class="prism-badge">⌘ ⇧</span>
+            <span class="prism-badge">⌘ \\</span>
+          </div>
         </div>
-      </div>
 
-      <!-- Main Overlay Panels -->
-      <div class="prism-overlay-panels">
-        <!-- Live Insights Panel -->
-        <div class="prism-panel" id="prism-live-insights">
-          <div class="glass-panel prism-space-y-6">
-            <!-- Header -->
-            <div class="prism-flex prism-items-center prism-gap-3">
-              <svg class="prism-icon-lg prism-text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
-              </svg>
-              <h3 class="prism-text-white prism-font-semibold">Live insights</h3>
-              <div class="prism-flex prism-items-center prism-gap-2 prism-ml-auto">
-                <button class="prism-button ghost">
+        <!-- Main Content -->
+        <div class="prism-main-content" id="prism-main-content">
+          <!-- Live Insights Panel -->
+          <div class="prism-panel" id="prism-insights">
+            <div class="glass-panel prism-space-y-4">
+              <!-- Header -->
+              <div class="prism-flex prism-items-center prism-justify-between">
+                <div class="prism-flex prism-items-center prism-gap-2">
+                  <div class="prism-status-dot prism-bg-blue-500 prism-animate-pulse"></div>
+                  <h3 class="prism-text-white prism-font-semibold">Live insights</h3>
+                </div>
+                <button class="prism-button prism-button-ghost">
                   <svg class="prism-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                  </svg>
-                  <span class="prism-ml-1 prism-text-sm">Show transcript</span>
-                </button>
-                <button class="prism-button ghost">
-                  <svg class="prism-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
                   </svg>
                 </button>
               </div>
-            </div>
 
-            <!-- Current Topic -->
-            <div class="prism-space-y-3">
-              <h4 class="prism-text-white prism-font-medium">Content Analysis</h4>
-              <div class="prism-space-y-2" id="prism-insights-list">
-                <div class="prism-flex prism-items-start prism-gap-2">
-                  <div class="prism-status-dot prism-bg-orange-400 prism-mt-2 prism-flex-shrink-0"></div>
-                  <p class="prism-text-white-80 prism-text-sm prism-leading-relaxed">Analyzing current content for insights...</p>
+              <!-- Content Analysis Status -->
+              <div class="prism-content-analysis">
+                <div class="prism-flex prism-items-center prism-gap-2 prism-mb-3">
+                  <div class="prism-status-dot prism-bg-green-500"></div>
+                  <span class="prism-text-white-80 prism-text-sm">Content Analysis</span>
+                </div>
+
+                <!-- Insights List -->
+                <div class="prism-insights-list" id="prism-insights-list">
+                  <div class="prism-insight-item">
+                    <div class="prism-flex prism-items-center prism-gap-2">
+                      <div class="prism-topic-dot prism-bg-blue-500"></div>
+                      <span class="prism-text-white-90 prism-text-sm">Analyzing content...</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Actions -->
+              <div class="prism-actions">
+                <h4 class="prism-text-white-80 prism-text-xs prism-font-semibold prism-mb-2">Actions</h4>
+                <div class="prism-actions-grid" id="prism-actions-grid">
+                  <button class="prism-action-button active">
+                    <svg class="prism-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                    </svg>
+                    <span class="prism-text-sm">Get insights</span>
+                  </button>
                 </div>
               </div>
             </div>
-
-            <!-- Actions -->
-            <div class="prism-space-y-3">
-              <h4 class="prism-text-white prism-font-medium">Actions</h4>
-              <div class="prism-space-y-2" id="prism-actions-list">
-                <button class="prism-action-button">
-                  <svg class="prism-icon prism-flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                  </svg>
-                  <span class="prism-text-sm">Analyze content</span>
-                </button>
-                <button class="prism-action-button">
-                  <svg class="prism-icon prism-flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
-                  </svg>
-                  <span class="prism-text-sm">Suggest questions</span>
-                </button>
-                <button class="prism-action-button">
-                  <svg class="prism-icon prism-flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                  </svg>
-                  <span class="prism-text-sm">Get insights</span>
-                </button>
-              </div>
-            </div>
           </div>
-        </div>
 
-        <!-- AI Response Panel -->
-        <div class="prism-panel" id="prism-ai-response">
-          <div class="glass-panel prism-space-y-4">
-            <!-- Header -->
-            <div class="prism-flex prism-items-center prism-justify-between">
-              <div class="prism-flex prism-items-center prism-gap-2">
-                <div class="prism-status-dot prism-bg-red-500 prism-animate-pulse"></div>
-                <h3 class="prism-text-white prism-font-semibold">AI response</h3>
-              </div>
-        <div class="prism-flex prism-items-center prism-gap-2">
-          <button class="prism-button ghost">
-            <svg class="prism-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-            </svg>
-          </button>
-          <button class="prism-button ghost">
-            <svg class="prism-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-          </button>
-        </div>
-            </div>
-
-            <!-- Question -->
-            <div class="prism-question-bg prism-rounded-lg prism-p-3">
-              <p class="prism-text-white-90 prism-text-sm">What are the differences between EBITDA and net income?</p>
-            </div>
-
-            <!-- Response -->
-            <div class="prism-space-y-3">
-              <div class="prism-text-white-90 prism-text-sm prism-leading-relaxed" id="prism-ai-text">
-                EBITDA is earnings before interest, taxes, depreciation, and amortization. Net income is profit after all expenses are deducted, giving a more complete picture of profitability.
+          <!-- AI Response Panel -->
+          <div class="prism-panel" id="prism-ai-response">
+            <div class="glass-panel prism-space-y-4">
+              <!-- Header -->
+              <div class="prism-flex prism-items-center prism-justify-between">
+                <div class="prism-flex prism-items-center prism-gap-2">
+                  <div class="prism-status-dot prism-bg-red-500 prism-animate-pulse"></div>
+                  <h3 class="prism-text-white prism-font-semibold">AI response</h3>
+                </div>
+                <div class="prism-flex prism-items-center prism-gap-2">
+                  <button class="prism-button prism-button-ghost">
+                    <svg class="prism-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                    </svg>
+                  </button>
+                  <button class="prism-button prism-button-ghost">
+                    <svg class="prism-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                  </button>
+                </div>
               </div>
 
-              <div class="prism-flex prism-items-center prism-gap-2 prism-pt-2">
-                <div class="prism-confidence-badge prism-badge">95% confidence</div>
-                <button class="prism-button prism-text-xs">
-                  <svg class="prism-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
-                  </svg>
-                  <span class="prism-mr-1">Sources</span>
-                </button>
+              <!-- Question -->
+              <div class="prism-question-bg prism-rounded-lg prism-p-3">
+                <p class="prism-text-white-90 prism-text-sm">What are the differences between EBITDA and net income?</p>
+              </div>
+
+              <!-- Response -->
+              <div class="prism-space-y-3">
+                <div class="prism-text-white-90 prism-text-sm prism-leading-relaxed" id="prism-ai-text">
+                  EBITDA is earnings before interest, taxes, depreciation, and amortization. Net income is profit after all expenses are deducted, giving a more complete picture of profitability.
+                </div>
+
+                <div class="prism-flex prism-items-center prism-gap-2 prism-pt-2">
+                  <div class="prism-confidence-badge prism-badge">95% confidence</div>
+                  <button class="prism-button prism-text-xs">
+                    <svg class="prism-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                    </svg>
+                    View sources
+                  </button>
+                </div>
               </div>
             </div>
-
-            <!-- Related Topics -->
-            <div class="prism-space-y-2 prism-pt-2 border-t prism-border-overlay-10">
-              <p class="prism-text-white-60 prism-text-xs prism-font-medium">Related topics</p>
-              <div class="prism-flex prism-flex-wrap prism-gap-2">
-                <button class="prism-topic-button">
-                  Financial metrics
-                </button>
-                <button class="prism-topic-button">
-                  Profitability analysis
-                </button>
-                <button class="prism-topic-button">
-                  Cash flow
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Minimize/Maximize Control -->
-      <div class="prism-minimize-control">
-        <button class="prism-button" id="prism-minimize-toggle">
-          <svg class="prism-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" id="prism-minimize-icon">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path>
-          </svg>
-        </button>
-      </div>
-
-      <!-- Floating Microphone Button -->
-      <div class="prism-mic-button">
-        <button class="prism-w-16 prism-h-16 prism-rounded-full prism-transition-all prism-duration-300 prism-border-2 pulse-glow" id="prism-mic-main">
-          <svg class="prism-icon-xl prism-text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" id="prism-mic-icon">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
-          </svg>
-        </button>
-
-        <!-- Tooltip -->
-        <div class="prism-tooltip prism-hidden" id="prism-mic-tooltip">
-          <div class="glass-panel prism-rounded-lg prism-px-3 prism-py-2 prism-whitespace-nowrap">
-            <p class="prism-text-white prism-text-sm">Say "Hey Prism" or click to start</p>
           </div>
         </div>
       </div>
@@ -307,49 +258,47 @@ class PrismAIOverlay {
   }
 
   bindEventListeners() {
-    // Show/Hide toggle
-    const showHideBtn = this.overlay.querySelector('#prism-show-hide');
-    showHideBtn?.addEventListener('click', () => this.toggleVisibility());
-
-    // Ask AI button
-    const askAiBtn = this.overlay.querySelector('#prism-ask-ai');
-    askAiBtn?.addEventListener('click', () => this.toggleListening());
-
-    // Minimize toggle
-    const minimizeBtn = this.overlay.querySelector('#prism-minimize-toggle');
-    minimizeBtn?.addEventListener('click', () => this.toggleMinimize());
-
-    // Microphone button
-    const micBtn = this.overlay.querySelector('#prism-mic-main');
-    micBtn?.addEventListener('click', () => {
+    // Play/Pause button
+    document.getElementById('prism-play-btn')?.addEventListener('click', () => {
       this.toggleListening();
-      this.showOverlay();
     });
 
-    // Microphone hover
-    micBtn?.addEventListener('mouseenter', () => this.showMicTooltip());
-    micBtn?.addEventListener('mouseleave', () => this.hideMicTooltip());
+    // Ask AI button
+    document.getElementById('prism-ask-ai')?.addEventListener('click', () => {
+      this.triggerAnalysis();
+    });
 
-    // Keyboard shortcuts
-    document.addEventListener('keydown', (e) => this.handleKeydown(e));
+    // Toggle visibility button
+    document.getElementById('prism-toggle-btn')?.addEventListener('click', () => {
+      this.toggleMinimize();
+    });
+
+    // Microphone button (if exists)
+    document.getElementById('prism-mic-btn')?.addEventListener('click', () => {
+      this.toggleListening();
+    });
   }
 
-  handleKeydown(e) {
-    // Cmd/Ctrl + Shift - Toggle listening
-    if ((e.metaKey || e.ctrlKey) && e.shiftKey) {
-      e.preventDefault();
-      this.toggleListening();
-    }
-    
-    // Cmd/Ctrl + Backslash - Toggle visibility
-    if ((e.metaKey || e.ctrlKey) && e.key === '\\') {
-      e.preventDefault();
-      this.toggleVisibility();
-    }
+  setupKeyboardShortcuts() {
+    document.addEventListener('keydown', (e) => {
+      // Cmd/Ctrl + Shift - Toggle listening
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'Shift') {
+        e.preventDefault();
+        this.toggleListening();
+      }
+      
+      // Cmd/Ctrl + Backslash - Toggle overlay
+      if ((e.metaKey || e.ctrlKey) && e.key === '\\') {
+        e.preventDefault();
+        this.toggleVisibility();
+      }
+    });
   }
 
   async handleMessage(request, sendResponse) {
     try {
+      console.log('Prism AI Overlay: Handling message:', request.action);
+      
       switch (request.action) {
         case 'toggleOverlay':
           this.toggleVisibility();
@@ -371,6 +320,10 @@ class PrismAIOverlay {
           await this.triggerAutoAnalysis();
           sendResponse({ success: true });
           break;
+        case 'performWebSearch':
+          await this.performWebSearch(request.query, request.context);
+          sendResponse({ success: true });
+          break;
         case 'getCedarStore':
           sendResponse({ success: true, data: this.cedarStore });
           break;
@@ -389,7 +342,6 @@ class PrismAIOverlay {
       return await chrome.runtime.sendMessage(message);
     } catch (error) {
       console.error('Extension context error:', error);
-      // Return a fallback response
       return {
         success: false,
         error: 'Extension context invalidated',
@@ -399,10 +351,11 @@ class PrismAIOverlay {
   }
 
   toggleVisibility() {
+    console.log('Prism AI Overlay: Toggling visibility');
     this.isVisible = !this.isVisible;
     if (this.isVisible) {
       this.overlay.classList.remove('prism-hidden');
-      // Trigger auto-analysis when overlay is shown
+      // Trigger auto-analysis after a short delay
       setTimeout(() => {
         this.triggerAutoAnalysis();
       }, 500);
@@ -411,29 +364,23 @@ class PrismAIOverlay {
     }
   }
 
-  showOverlay() {
-    if (!this.isVisible) {
-      this.toggleVisibility();
-    }
-  }
-
   toggleListening() {
+    console.log('Prism AI Overlay: Toggling listening');
     this.isListening = !this.isListening;
     
-    const askAiBtn = this.overlay.querySelector('#prism-ask-ai');
-    const micBtn = this.overlay.querySelector('#prism-mic-main');
-    const waveform = this.overlay.querySelector('#prism-waveform');
+    const micBtn = document.getElementById('prism-mic-btn') || document.getElementById('prism-play-btn');
+    const waveform = document.getElementById('prism-waveform');
     
     if (this.isListening) {
-      askAiBtn?.classList.add('listening');
       micBtn?.classList.add('listening-pulse');
       micBtn?.classList.remove('pulse-glow');
       waveform?.classList.remove('prism-hidden');
+      this.startVoiceRecognition();
     } else {
-      askAiBtn?.classList.remove('listening');
       micBtn?.classList.remove('listening-pulse');
       micBtn?.classList.add('pulse-glow');
       waveform?.classList.add('prism-hidden');
+      this.stopVoiceRecognition();
     }
     
     // Notify background script
@@ -445,71 +392,84 @@ class PrismAIOverlay {
 
   toggleMinimize() {
     this.isMinimized = !this.isMinimized;
+    const mainContent = document.getElementById('prism-main-content');
+    const toggleBtn = document.getElementById('prism-toggle-btn');
     
-    const panels = this.overlay.querySelectorAll('.prism-panel');
-    const icon = this.overlay.querySelector('#prism-minimize-icon');
-    
-    panels.forEach(panel => {
-      if (this.isMinimized) {
-        panel.classList.add('minimized');
-      } else {
-        panel.classList.remove('minimized');
-      }
-    });
-    
-    // Update icon
     if (this.isMinimized) {
-      icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>';
+      mainContent?.classList.add('prism-hidden');
+      toggleBtn?.querySelector('svg')?.setAttribute('d', 'M19 9l-7 7-7-7');
     } else {
-      icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path>';
+      mainContent?.classList.remove('prism-hidden');
+      toggleBtn?.querySelector('svg')?.setAttribute('d', 'M5 15l7-7 7 7');
     }
   }
 
-  showMicTooltip() {
-    const tooltip = this.overlay.querySelector('#prism-mic-tooltip');
-    const tooltipText = tooltip?.querySelector('p');
+  startVoiceRecognition() {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      console.log('Speech recognition not supported');
+      return;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    this.recognition = new SpeechRecognition();
     
-    if (tooltip && tooltipText) {
-      tooltipText.textContent = this.isListening ? "Stop listening" : 'Say "Hey Prism" or click to start';
-      tooltip.classList.remove('prism-hidden');
+    this.recognition.continuous = true;
+    this.recognition.interimResults = true;
+    this.recognition.lang = 'en-US';
+
+    this.recognition.onstart = () => {
+      console.log('Voice recognition started');
+    };
+
+    this.recognition.onresult = (event) => {
+      let finalTranscript = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript;
+        }
+      }
+      
+      if (finalTranscript) {
+        console.log('Voice input:', finalTranscript);
+        this.processVoiceInput(finalTranscript);
+      }
+    };
+
+    this.recognition.onerror = (event) => {
+      console.error('Voice recognition error:', event.error);
+      this.isListening = false;
+    };
+
+    this.recognition.start();
+  }
+
+  stopVoiceRecognition() {
+    if (this.recognition) {
+      this.recognition.stop();
+      this.recognition = null;
     }
   }
 
-  hideMicTooltip() {
-    const tooltip = this.overlay.querySelector('#prism-mic-tooltip');
-    tooltip?.classList.add('prism-hidden');
-  }
-
-  async updateInsights(data) {
-    // Update live insights panel with new data
-    console.log('Updating insights:', data);
+  async processVoiceInput(text) {
+    console.log('Processing voice input:', text);
     
-    if (data && data.insights) {
-      this.cedarStore.currentInsights = data.insights;
-      this.updateInsightsPanel(data.insights);
-    }
-    
-    if (data && data.actions) {
-      this.cedarStore.currentActions = data.actions;
-      this.updateActionsPanel(data.actions);
-    }
-  }
-
-  async updateAIResponse(data) {
-    // Update AI response panel with new data
-    console.log('Updating AI response:', data);
-    
-    if (data && data.summary) {
-      this.updateAIResponseText(data.summary);
-    }
-    
-    if (data && data.confidence) {
-      this.updateConfidenceBadge(data.confidence);
+    try {
+      const response = await this.sendMessageSafely({
+        action: 'processVoiceInput',
+        text: text
+      });
+      
+      if (response.success && response.data) {
+        await this.updateAIResponse(response.data);
+      }
+    } catch (error) {
+      console.error('Error processing voice input:', error);
     }
   }
 
   async triggerAutoAnalysis() {
-    // Trigger automatic content analysis when overlay is shown
+    console.log('Prism AI Overlay: Triggering auto-analysis');
+    
     try {
       const response = await this.sendMessageSafely({
         action: 'triggerAnalysis',
@@ -520,56 +480,98 @@ class PrismAIOverlay {
         }
       });
       
-      if (response.success) {
+      if (response.success && response.data) {
         await this.updateInsights(response.data);
         await this.updateAIResponse(response.data);
       }
     } catch (error) {
-      console.error('Error triggering auto analysis:', error);
+      console.error('Error triggering analysis:', error);
     }
   }
 
-  updateInsightsPanel(insights) {
-    const insightsContainer = this.overlay.querySelector('#prism-insights-list');
-    if (insightsContainer && insights) {
-      insightsContainer.innerHTML = insights.map(insight => `
-        <div class="prism-flex prism-items-start prism-gap-2">
-          <div class="prism-status-dot prism-bg-orange-400 prism-mt-2 prism-flex-shrink-0"></div>
-          <p class="prism-text-white-80 prism-text-sm prism-leading-relaxed">${insight}</p>
+  async updateInsights(data) {
+    console.log('Updating insights:', data);
+    
+    const insightsList = document.getElementById('prism-insights-list');
+    const actionsGrid = document.getElementById('prism-actions-grid');
+    
+    if (insightsList && data.insights) {
+      insightsList.innerHTML = data.insights.map(insight => `
+        <div class="prism-insight-item">
+          <div class="prism-flex prism-items-center prism-gap-2">
+            <div class="prism-topic-dot prism-bg-blue-500"></div>
+            <span class="prism-text-white-90 prism-text-sm">${insight}</span>
+          </div>
         </div>
       `).join('');
     }
-  }
-
-  updateActionsPanel(actions) {
-    const actionsContainer = this.overlay.querySelector('#prism-actions-list');
-    if (actionsContainer && actions) {
-      actionsContainer.innerHTML = actions.map(action => `
-        <button class="prism-action-button ${action.active ? 'active' : ''}">
-          <svg class="prism-icon prism-flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+    
+    if (actionsGrid && data.actions) {
+      actionsGrid.innerHTML = data.actions.map(action => `
+        <button class="prism-action-button active">
+          <svg class="prism-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
           </svg>
-          <span class="prism-text-sm">${action.text}</span>
+          <span class="prism-text-sm">${action}</span>
         </button>
       `).join('');
     }
   }
 
-  updateAIResponseText(text) {
-    const responseElement = this.overlay.querySelector('#prism-ai-text');
-    if (responseElement) {
-      responseElement.textContent = text;
+  async updateAIResponse(data) {
+    console.log('Updating AI response:', data);
+    
+    const aiText = document.getElementById('prism-ai-text');
+    const confidenceBadge = document.querySelector('.prism-confidence-badge');
+    
+    if (aiText && data.summary) {
+      aiText.textContent = data.summary;
+    }
+    
+    if (confidenceBadge && data.confidence) {
+      confidenceBadge.textContent = `${Math.round(data.confidence * 100)}% confidence`;
     }
   }
 
-  updateConfidenceBadge(confidence) {
-    const confidenceElement = this.overlay.querySelector('.prism-confidence-badge');
-    if (confidenceElement) {
-      const percentage = Math.round(confidence * 100);
-      confidenceElement.textContent = `${percentage}% confidence`;
+  async performWebSearch(query, context) {
+    console.log('Prism AI Overlay: Performing web search for:', query);
+    
+    try {
+      const response = await this.sendMessageSafely({
+        action: 'webSearch',
+        query: query,
+        context: context
+      });
+      
+      if (response.success && response.data) {
+        await this.updateAIResponse(response.data);
+        await this.updateInsights({
+          insights: [`Web search completed for: ${query}`],
+          actions: response.data.sources?.map(source => `View: ${source.title}`) || []
+        });
+      }
+    } catch (error) {
+      console.error('Error performing web search:', error);
+    }
+  }
+
+  updateListeningState(isListening) {
+    this.isListening = isListening;
+    const micBtn = document.getElementById('prism-mic-btn') || document.getElementById('prism-play-btn');
+    const waveform = document.getElementById('prism-waveform');
+    
+    if (isListening) {
+      micBtn?.classList.add('listening-pulse');
+      micBtn?.classList.remove('pulse-glow');
+      waveform?.classList.remove('prism-hidden');
+    } else {
+      micBtn?.classList.remove('listening-pulse');
+      micBtn?.classList.add('pulse-glow');
+      waveform?.classList.add('prism-hidden');
     }
   }
 }
 
-// Initialize overlay when script loads
+// Initialize overlay
+console.log('Prism AI Overlay: Loading content script');
 new PrismAIOverlay();

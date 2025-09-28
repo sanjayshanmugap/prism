@@ -11,9 +11,9 @@ export const apiConfig = {
     baseURL: 'https://api.openai.com/v1'
   },
   
-  // Perplexity Configuration (for future implementation)
+  // Perplexity Configuration
   perplexity: {
-    apiKey: process.env.PERPLEXITY_API_KEY || 'your-perplexity-api-key-here',
+    perplexityApiKey: process.env.PERPLEXITY_API_KEY || 'your-perplexity-api-key-here',
     model: 'llama-3.1-sonar-large-128k-online',
     baseURL: 'https://api.perplexity.ai'
   },
