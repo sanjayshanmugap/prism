@@ -7,6 +7,12 @@ class PrismAIOverlay {
     this.isVisible = false;
     this.isListening = false;
     this.isMinimized = false;
+    this.cedarStore = {
+      messages: [],
+      isProcessing: false,
+      currentInsights: [],
+      currentActions: []
+    };
     this.init();
   }
 
@@ -165,15 +171,11 @@ class PrismAIOverlay {
 
             <!-- Current Topic -->
             <div class="prism-space-y-3">
-              <h4 class="prism-text-white prism-font-medium">Financial terms discussion</h4>
-              <div class="prism-space-y-2">
+              <h4 class="prism-text-white prism-font-medium">Content Analysis</h4>
+              <div class="prism-space-y-2" id="prism-insights-list">
                 <div class="prism-flex prism-items-start prism-gap-2">
                   <div class="prism-status-dot prism-bg-orange-400 prism-mt-2 prism-flex-shrink-0"></div>
-                  <p class="prism-text-white-80 prism-text-sm prism-leading-relaxed">The conversation is shifting towards a discussion of common financial terms.</p>
-                </div>
-                <div class="prism-flex prism-items-start prism-gap-2">
-                  <div class="prism-status-dot prism-bg-orange-400 prism-mt-2 prism-flex-shrink-0"></div>
-                  <p class="prism-text-white-80 prism-text-sm prism-leading-relaxed">You were asked to explain the difference between EBITDA and net income.</p>
+                  <p class="prism-text-white-80 prism-text-sm prism-leading-relaxed">Analyzing current content for insights...</p>
                 </div>
               </div>
             </div>
@@ -181,30 +183,24 @@ class PrismAIOverlay {
             <!-- Actions -->
             <div class="prism-space-y-3">
               <h4 class="prism-text-white prism-font-medium">Actions</h4>
-              <div class="prism-space-y-2">
+              <div class="prism-space-y-2" id="prism-actions-list">
                 <button class="prism-action-button">
                   <svg class="prism-icon prism-flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                   </svg>
-                  <span class="prism-text-sm">Define EBITDA</span>
-                </button>
-                <button class="prism-action-button active">
-                  <svg class="prism-icon prism-flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                  </svg>
-                  <span class="prism-text-sm">What are the differences between EBITDA and net income?</span>
+                  <span class="prism-text-sm">Analyze content</span>
                 </button>
                 <button class="prism-action-button">
                   <svg class="prism-icon prism-flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
                   </svg>
-                  <span class="prism-text-sm">Suggest follow-up questions</span>
+                  <span class="prism-text-sm">Suggest questions</span>
                 </button>
                 <button class="prism-action-button">
                   <svg class="prism-icon prism-flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                   </svg>
-                  <span class="prism-text-sm">What should I say next?</span>
+                  <span class="prism-text-sm">Get insights</span>
                 </button>
               </div>
             </div>
@@ -344,26 +340,38 @@ class PrismAIOverlay {
     }
   }
 
-  handleMessage(request, sendResponse) {
-    switch (request.action) {
-      case 'toggleOverlay':
-        this.toggleVisibility();
-        sendResponse({ success: true });
-        break;
-      case 'toggleListening':
-        this.toggleListening();
-        sendResponse({ success: true });
-        break;
-      case 'updateInsights':
-        this.updateInsights(request.data);
-        sendResponse({ success: true });
-        break;
-      case 'updateAIResponse':
-        this.updateAIResponse(request.data);
-        sendResponse({ success: true });
-        break;
-      default:
-        sendResponse({ success: false, error: 'Unknown action' });
+  async handleMessage(request, sendResponse) {
+    try {
+      switch (request.action) {
+        case 'toggleOverlay':
+          this.toggleVisibility();
+          sendResponse({ success: true });
+          break;
+        case 'toggleListening':
+          this.toggleListening();
+          sendResponse({ success: true });
+          break;
+        case 'updateInsights':
+          await this.updateInsights(request.data);
+          sendResponse({ success: true });
+          break;
+        case 'updateAIResponse':
+          await this.updateAIResponse(request.data);
+          sendResponse({ success: true });
+          break;
+        case 'triggerAutoAnalysis':
+          await this.triggerAutoAnalysis();
+          sendResponse({ success: true });
+          break;
+        case 'getCedarStore':
+          sendResponse({ success: true, data: this.cedarStore });
+          break;
+        default:
+          sendResponse({ success: false, error: 'Unknown action' });
+      }
+    } catch (error) {
+      console.error('Content script error:', error);
+      sendResponse({ success: false, error: error.message });
     }
   }
 
@@ -371,6 +379,10 @@ class PrismAIOverlay {
     this.isVisible = !this.isVisible;
     if (this.isVisible) {
       this.overlay.classList.remove('prism-hidden');
+      // Trigger auto-analysis when overlay is shown
+      setTimeout(() => {
+        this.triggerAutoAnalysis();
+      }, 500);
     } else {
       this.overlay.classList.add('prism-hidden');
     }
@@ -445,14 +457,94 @@ class PrismAIOverlay {
     tooltip?.classList.add('prism-hidden');
   }
 
-  updateInsights(data) {
+  async updateInsights(data) {
     // Update live insights panel with new data
     console.log('Updating insights:', data);
+    
+    if (data && data.insights) {
+      this.cedarStore.currentInsights = data.insights;
+      this.updateInsightsPanel(data.insights);
+    }
+    
+    if (data && data.actions) {
+      this.cedarStore.currentActions = data.actions;
+      this.updateActionsPanel(data.actions);
+    }
   }
 
-  updateAIResponse(data) {
+  async updateAIResponse(data) {
     // Update AI response panel with new data
     console.log('Updating AI response:', data);
+    
+    if (data && data.summary) {
+      this.updateAIResponseText(data.summary);
+    }
+    
+    if (data && data.confidence) {
+      this.updateConfidenceBadge(data.confidence);
+    }
+  }
+
+  async triggerAutoAnalysis() {
+    // Trigger automatic content analysis when overlay is shown
+    try {
+      const response = await chrome.runtime.sendMessage({
+        action: 'triggerAnalysis',
+        content: {
+          url: window.location.href,
+          title: document.title,
+          text: document.body.innerText
+        }
+      });
+      
+      if (response.success) {
+        await this.updateInsights(response.data);
+        await this.updateAIResponse(response.data);
+      }
+    } catch (error) {
+      console.error('Error triggering auto analysis:', error);
+    }
+  }
+
+  updateInsightsPanel(insights) {
+    const insightsContainer = this.overlay.querySelector('#prism-insights-list');
+    if (insightsContainer && insights) {
+      insightsContainer.innerHTML = insights.map(insight => `
+        <div class="prism-flex prism-items-start prism-gap-2">
+          <div class="prism-status-dot prism-bg-orange-400 prism-mt-2 prism-flex-shrink-0"></div>
+          <p class="prism-text-white-80 prism-text-sm prism-leading-relaxed">${insight}</p>
+        </div>
+      `).join('');
+    }
+  }
+
+  updateActionsPanel(actions) {
+    const actionsContainer = this.overlay.querySelector('#prism-actions-list');
+    if (actionsContainer && actions) {
+      actionsContainer.innerHTML = actions.map(action => `
+        <button class="prism-action-button ${action.active ? 'active' : ''}">
+          <svg class="prism-icon prism-flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+          </svg>
+          <span class="prism-text-sm">${action.text}</span>
+        </button>
+      `).join('');
+    }
+  }
+
+  updateAIResponseText(text) {
+    const responseElement = this.overlay.querySelector('#prism-ai-text');
+    if (responseElement) {
+      responseElement.textContent = text;
+    }
+  }
+
+  updateConfidenceBadge(confidence) {
+    const confidenceElement = this.overlay.querySelector('.prism-confidence-badge');
+    if (confidenceElement) {
+      const percentage = Math.round(confidence * 100);
+      confidenceElement.textContent = `${percentage}% confidence`;
+    }
   }
 }
 

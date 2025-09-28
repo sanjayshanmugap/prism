@@ -1,10 +1,14 @@
 // Prism AI Overlay Background Script
 // Handles voice recognition, AI processing, and communication with content scripts
+// Integrated with CedarOS + Mastra for AI functionality
+
+import { mastraConfig, processAgentResponse, createCedarStore } from './backend/mastra-config.js';
 
 class PrismAIBackground {
   constructor() {
     this.isListening = false;
     this.recognition = null;
+    this.cedarStore = createCedarStore();
     this.init();
   }
 
@@ -49,6 +53,22 @@ class PrismAIBackground {
           const analysis = await this.analyzeContent(request.content, sender.tab.id);
           sendResponse({ success: true, data: analysis });
           break;
+        case 'getCedarStore':
+          sendResponse({ success: true, data: this.cedarStore });
+          break;
+        case 'clearMessages':
+          this.cedarStore.clearMessages();
+          sendResponse({ success: true });
+          break;
+        case 'triggerAnalysis':
+          const autoAnalysis = await this.analyzeContent(request.content, sender.tab.id);
+          // Send analysis to content script
+          chrome.tabs.sendMessage(sender.tab.id, {
+            action: 'updateInsights',
+            data: autoAnalysis
+          });
+          sendResponse({ success: true, data: autoAnalysis });
+          break;
         default:
           sendResponse({ success: false, error: 'Unknown action' });
       }
@@ -71,18 +91,53 @@ class PrismAIBackground {
   async processVoiceInput(text, tabId) {
     console.log('Processing voice input:', text);
     
-    // Get current tab content for context
-    const tabContent = await this.getTabContent(tabId);
-    
-    // TODO: Integrate with CedarOS + Mastra for AI processing
-    // This is where we'll add the OpenAI integration
-    
-    return {
-      originalText: text,
-      processedText: text,
-      context: tabContent,
-      timestamp: Date.now()
-    };
+    try {
+      // Get current tab content for context
+      const tabContent = await this.getTabContent(tabId);
+      
+      // Process with CedarOS + Mastra voice agent
+      const voiceResponse = await processAgentResponse('voiceProcessing', {
+        transcript: text,
+        additionalContext: {
+          webContent: tabContent,
+          tabId: tabId
+        }
+      });
+      
+      // If voice processing indicates content analysis needed, trigger it
+      if (voiceResponse.action?.type === 'content_analysis') {
+        const analysisResponse = await processAgentResponse('contentAnalysis', {
+          prompt: text,
+          additionalContext: {
+            webContent: tabContent,
+            voiceIntent: voiceResponse.intent
+          }
+        });
+        
+        return {
+          originalText: text,
+          voiceResponse: voiceResponse,
+          analysisResponse: analysisResponse,
+          context: tabContent,
+          timestamp: Date.now()
+        };
+      }
+      
+      return {
+        originalText: text,
+        voiceResponse: voiceResponse,
+        context: tabContent,
+        timestamp: Date.now()
+      };
+      
+    } catch (error) {
+      console.error('Error processing voice input:', error);
+      return {
+        originalText: text,
+        error: error.message,
+        timestamp: Date.now()
+      };
+    }
   }
 
   async getTabContent(tabId) {
@@ -110,15 +165,37 @@ class PrismAIBackground {
   async analyzeContent(content, tabId) {
     console.log('Analyzing content for tab:', tabId);
     
-    // TODO: Integrate with CedarOS + Mastra for content analysis
-    // This will be where we implement the AI analysis and summarization
-    
-    return {
-      summary: 'Content analysis will be implemented with CedarOS + Mastra',
-      insights: ['AI insights will be generated here'],
-      actions: ['Suggested actions will appear here'],
-      timestamp: Date.now()
-    };
+    try {
+      // Process with CedarOS + Mastra content analysis agent
+      const analysisResponse = await processAgentResponse('contentAnalysis', {
+        prompt: 'Analyze this web content and provide insights',
+        additionalContext: {
+          webContent: content,
+          tabId: tabId
+        }
+      });
+      
+      // Update Cedar store with the analysis
+      this.cedarStore.addMessage(analysisResponse);
+      
+      return {
+        summary: analysisResponse.content || 'Content analyzed successfully',
+        insights: analysisResponse.insights || ['Analyzing content for insights...'],
+        actions: analysisResponse.actions || ['Suggested actions will appear here'],
+        confidence: analysisResponse.confidence || 0.8,
+        sources: analysisResponse.sources || [],
+        timestamp: Date.now()
+      };
+      
+    } catch (error) {
+      console.error('Error analyzing content:', error);
+      return {
+        summary: 'Error analyzing content',
+        insights: ['Unable to analyze content at this time'],
+        actions: ['Please try again'],
+        timestamp: Date.now()
+      };
+    }
   }
 
   async toggleOverlay(tabId) {
