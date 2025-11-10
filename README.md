@@ -1,5 +1,4 @@
 # prism ai - your all in one news copilot
-(CedarOS wrapper)
 
 good journalism should unite and inform - not confuse and divide. in today's era of limited attention spans, polarizing echo chambers, and fluff news, it's really hard to get what you really want - the raw truth. at prism ai, we make it so that you get news that works for you your way. with multimodal voice-controlled and tactile options available, simply tap prism's microphone and ask it to summarize a news article, explain a concept, or give more context, and it'll generate a customized news report that gives you the results you truly want. 
 
